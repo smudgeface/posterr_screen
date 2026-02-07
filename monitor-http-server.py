@@ -9,6 +9,7 @@ from flask import Flask, jsonify, render_template_string
 import subprocess
 import re
 import os
+import time
 from datetime import datetime
 
 app = Flask(__name__)
@@ -1056,6 +1057,20 @@ def get_brightness_endpoint():
 @app.route('/brightness/<int:value>', methods=['GET'])
 def set_brightness_endpoint(value):
     """Set the monitor brightness level (0-100)"""
+    # Check if we're waking from sleep (brightness 0 -> non-zero)
+    if value > 0:
+        current_brightness, _ = get_brightness()
+
+        # If display is off (brightness 0), turn it on first and wait for it to wake
+        if current_brightness == 0:
+            # Turn on the display first
+            run_command(MONITOR_ON_SCRIPT)
+
+            # Wait for display to fully wake up before setting brightness
+            # Adjust this delay if needed (2-3 seconds is typical for monitors)
+            time.sleep(2.5)
+
+    # Now set the desired brightness
     success, error = set_brightness(value)
 
     if not success:
