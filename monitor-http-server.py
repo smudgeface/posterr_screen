@@ -1017,7 +1017,7 @@ def turn_on():
 
     # If monitor was off, wait for it to initialize then restore brightness
     if is_on is False or error:  # Was off or couldn't determine status
-        time.sleep(5.0)  # Wait for display to fully wake up
+        time.sleep(4.0)  # Wait for display to fully wake up
 
         # Restore last known brightness
         last_brightness = load_brightness_state()
@@ -1107,7 +1107,7 @@ def set_brightness_endpoint(value):
 
             # Wait for display to fully wake up before setting brightness
             # Adjust this delay if needed - testing to find minimum stable delay
-            time.sleep(5.0)
+            time.sleep(4.0)
 
     # Now set the desired brightness
     success, error = set_brightness(value)
