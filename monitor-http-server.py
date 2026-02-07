@@ -1067,8 +1067,8 @@ def set_brightness_endpoint(value):
             run_command(MONITOR_ON_SCRIPT)
 
             # Wait for display to fully wake up before setting brightness
-            # Adjust this delay if needed (2-3 seconds is typical for monitors)
-            time.sleep(2.5)
+            # Adjust this delay if needed - testing to find minimum stable delay
+            time.sleep(5.0)
 
     # Now set the desired brightness
     success, error = set_brightness(value)
