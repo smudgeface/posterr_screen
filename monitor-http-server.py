@@ -21,6 +21,8 @@ DDC_FEATURE_BRIGHTNESS = "10"
 MONITOR_ON_SCRIPT = "/home/pi/monitor-on.sh"
 MONITOR_OFF_SCRIPT = "/home/pi/monitor-off.sh"
 WATCHDOG_LOG = "/var/log/wifi-watchdog.log"
+BRIGHTNESS_STATE_FILE = "/tmp/monitor_last_brightness.txt"
+DEFAULT_BRIGHTNESS = 50  # Default brightness when no previous state exists
 
 # HTML template for web interface
 HTML_TEMPLATE = """
@@ -906,6 +908,30 @@ def set_brightness(value):
         return False, f"Failed to set brightness: {stderr}"
 
 
+def save_brightness_state(brightness):
+    """Save the last brightness setting to a file"""
+    try:
+        with open(BRIGHTNESS_STATE_FILE, 'w') as f:
+            f.write(str(brightness))
+    except Exception as e:
+        # Non-critical error, just log it
+        print(f"Warning: Could not save brightness state: {e}")
+
+
+def load_brightness_state():
+    """Load the last brightness setting from file"""
+    try:
+        if os.path.exists(BRIGHTNESS_STATE_FILE):
+            with open(BRIGHTNESS_STATE_FILE, 'r') as f:
+                brightness = int(f.read().strip())
+                # Validate range
+                if 0 <= brightness <= 100:
+                    return brightness
+    except Exception:
+        pass
+    return DEFAULT_BRIGHTNESS
+
+
 def get_watchdog_status():
     """Get network watchdog status from log file"""
     if not os.path.exists(WATCHDOG_LOG):
@@ -976,20 +1002,33 @@ def index():
 
 @app.route('/on', methods=['GET'])
 def turn_on():
-    """Turn the monitor on"""
+    """Turn the monitor on and restore last brightness"""
+    # Check if monitor is currently off
+    is_on, error = get_monitor_status()
+
+    # Turn on the monitor
     success, stdout, stderr = run_command(MONITOR_ON_SCRIPT)
 
-    if success:
-        return jsonify({
-            "status": "success",
-            "message": "Monitor turned on",
-            "state": "on"
-        }), 200
-    else:
+    if not success:
         return jsonify({
             "status": "error",
             "message": f"Failed to turn on monitor: {stderr}"
         }), 500
+
+    # If monitor was off, wait for it to initialize then restore brightness
+    if is_on is False or error:  # Was off or couldn't determine status
+        time.sleep(5.0)  # Wait for display to fully wake up
+
+        # Restore last known brightness
+        last_brightness = load_brightness_state()
+        if last_brightness > 0:  # Only set if non-zero
+            set_brightness(last_brightness)
+
+    return jsonify({
+        "status": "success",
+        "message": "Monitor turned on",
+        "state": "on"
+    }), 200
 
 
 @app.route('/off', methods=['GET'])
@@ -1078,6 +1117,10 @@ def set_brightness_endpoint(value):
             "status": "error",
             "message": error
         }), 400
+
+    # Save brightness state for future power-on (only if non-zero)
+    if value > 0:
+        save_brightness_state(value)
 
     # Get the new brightness value to confirm
     brightness, get_error = get_brightness()
